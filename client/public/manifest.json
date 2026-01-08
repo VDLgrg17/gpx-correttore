@@ -1,0 +1,23 @@
+{
+  "name": "GPX Correttore Grammaticale",
+  "short_name": "GPX Correttore",
+  "description": "Correttore grammaticale italiano professionale offline-ready",
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
