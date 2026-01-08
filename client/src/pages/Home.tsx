@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { exportToDocx, exportToEpub, readFileContent, sortFiles } from "@/lib/file-utils";
 import { DEFAULT_OPTIONS, GPXEngine, GPXOptions, GPXResult } from "@/lib/gpx-engine";
 import { AlertTriangle, BookOpen, Copy, Download, FileText, RefreshCw, Settings, Trash2, Wand2, Printer, Brain, Loader2, Type, Clock, Quote, Sparkles, Pause, Play, Square, BookMarked, Edit3, Check, X, Save, Upload } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -99,6 +99,53 @@ export default function Home() {
   const [editingChapterIndex, setEditingChapterIndex] = useState<number | null>(null);
   const [showSaveButton, setShowSaveButton] = useState(false);
   const [completedChecks, setCompletedChecks] = useState<string[]>([]);
+  
+  // Frontmatter del libro (copertina, colophon, sommario, introduzione)
+  const [showFrontmatterPanel, setShowFrontmatterPanel] = useState(false);
+  
+  // Valori di default per il frontmatter
+  const defaultFrontmatter = {
+    // Copertina
+    autore: "",
+    autoreCorpo: 16, // dimensione font autore in pt
+    titolo: "",
+    titoloCorpo: 24, // dimensione font titolo in pt
+    sottotitolo: "",
+    sottotitoloCorpo: 14, // dimensione font sottotitolo in pt
+    // Colophon
+    editore: "",
+    sitoInternet: "",
+    copyright: "Tutti i diritti sono riservati a norma di legge. Nessuna parte di questo libro può essere riprodotta con alcun mezzo senza l'autorizzazione scritta dell'Autore e dell'Editore. È espressamente vietato trasmettere ad altri il presente libro, né in formato cartaceo né elettronico, né per denaro né a titolo gratuito. Le eventuali strategie riportate in questo libro sono frutto di anni di studi e specializzazioni, quindi non è garantito il raggiungimento dei medesimi risultati di crescita personale o professionale semplicemente leggendo il libro. Il lettore si assume piena responsabilità delle proprie scelte, consapevole dei rischi connessi a qualsiasi forma di esercizio. Il libro ha esclusivamente scopo formativo.",
+    // Introduzione
+    introduzione: "",
+    chiusuraIntroduzione: "Buona lettura",
+    // Backmatter (parte finale)
+    parteFinale: "", // contenitore unico per conclusioni, call to action, ringraziamenti, ecc.
+  };
+  
+  // Carica frontmatter da localStorage all'avvio
+  const [frontmatter, setFrontmatter] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gpx-frontmatter');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Merge con i default per gestire nuovi campi
+        return { ...defaultFrontmatter, ...parsed };
+      }
+    } catch (e) {
+      console.error('Errore caricamento frontmatter:', e);
+    }
+    return defaultFrontmatter;
+  });
+  
+  // Salva frontmatter in localStorage ogni volta che cambia
+  useEffect(() => {
+    try {
+      localStorage.setItem('gpx-frontmatter', JSON.stringify(frontmatter));
+    } catch (e) {
+      console.error('Errore salvataggio frontmatter:', e);
+    }
+  }, [frontmatter]);
 
   const handleFilesSelected = async (files: File[]) => {
     const newFiles = [...uploadedFiles, ...files];
@@ -466,7 +513,9 @@ export default function Home() {
   const handleExportDocx = async () => {
     if (!result) return;
     const textToExport = aiResult?.correctedText || result.corrected;
-    await exportToDocx(textToExport, "Testo_Corretto_GPX.docx");
+    // Passa il frontmatter solo se è stato compilato (almeno titolo o autore)
+    const fm = (frontmatter.titolo || frontmatter.autore) ? frontmatter : undefined;
+    await exportToDocx(textToExport, "Testo_Corretto_GPX.docx", 'standard', fm);
     toast.success("File DOCX scaricato!");
   };
 
@@ -588,6 +637,201 @@ export default function Home() {
             </div>
           </div>
         </header>
+
+        {/* Sezione Frontmatter - Dati del Libro */}
+        <Card className="shadow-sm border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+          <CardHeader 
+            className="pb-2 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors"
+            onClick={() => setShowFrontmatterPanel(!showFrontmatterPanel)}
+          >
+            <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BookMarked size={16} />
+                Frontmatter del Libro
+                <span className="text-xs font-normal text-amber-600 dark:text-amber-500">
+                  (Copertina, Colophon, Introduzione)
+                </span>
+              </div>
+              <span className="text-xs text-amber-500">
+                {showFrontmatterPanel ? '▲ Chiudi' : '▼ Apri'}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          
+          {showFrontmatterPanel && (
+            <CardContent className="pt-0 pb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Colonna 1: Copertina */}
+                <div className="space-y-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                    <span className="bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-[10px] px-1.5 py-0.5 rounded">1</span>
+                    Copertina
+                  </h4>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] text-slate-500">Autore</Label>
+                      <select
+                        value={frontmatter.autoreCorpo || 16}
+                        onChange={(e) => setFrontmatter({...frontmatter, autoreCorpo: parseInt(e.target.value)})}
+                        className="text-[10px] px-1 py-0.5 border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      >
+                        {[10, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36].map(size => (
+                          <option key={size} value={size}>corpo {size}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <input
+                      type="text"
+                      value={frontmatter.autore}
+                      onChange={(e) => setFrontmatter({...frontmatter, autore: e.target.value})}
+                      placeholder="Nome Autore"
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] text-slate-500">Titolo</Label>
+                      <select
+                        value={frontmatter.titoloCorpo || 24}
+                        onChange={(e) => setFrontmatter({...frontmatter, titoloCorpo: parseInt(e.target.value)})}
+                        className="text-[10px] px-1 py-0.5 border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      >
+                        {[14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48].map(size => (
+                          <option key={size} value={size}>corpo {size}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <input
+                      type="text"
+                      value={frontmatter.titolo}
+                      onChange={(e) => setFrontmatter({...frontmatter, titolo: e.target.value})}
+                      placeholder="Titolo del Libro"
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] text-slate-500">Sottotitolo</Label>
+                      <select
+                        value={frontmatter.sottotitoloCorpo || 14}
+                        onChange={(e) => setFrontmatter({...frontmatter, sottotitoloCorpo: parseInt(e.target.value)})}
+                        className="text-[10px] px-1 py-0.5 border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      >
+                        {[10, 12, 14, 16, 18, 20, 22, 24, 28, 32].map(size => (
+                          <option key={size} value={size}>corpo {size}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <input
+                      type="text"
+                      value={frontmatter.sottotitolo}
+                      onChange={(e) => setFrontmatter({...frontmatter, sottotitolo: e.target.value})}
+                      placeholder="Sottotitolo (opzionale)"
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Colonna 2: Colophon */}
+                <div className="space-y-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                    <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] px-1.5 py-0.5 rounded">2</span>
+                    Colophon
+                  </h4>
+                  <div>
+                    <Label className="text-[10px] text-slate-500">Editore</Label>
+                    <input
+                      type="text"
+                      value={frontmatter.editore}
+                      onChange={(e) => setFrontmatter({...frontmatter, editore: e.target.value})}
+                      placeholder="Nome Editore"
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-slate-500">Sito Internet</Label>
+                    <input
+                      type="text"
+                      value={frontmatter.sitoInternet}
+                      onChange={(e) => setFrontmatter({...frontmatter, sitoInternet: e.target.value})}
+                      placeholder="www.esempio.com"
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-slate-500">Copyright (margini giustificati)</Label>
+                    <textarea
+                      value={frontmatter.copyright}
+                      onChange={(e) => setFrontmatter({...frontmatter, copyright: e.target.value})}
+                      rows={3}
+                      style={{ textAlign: 'justify' }}
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-[10px] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Colonna 3: Sommario (info) */}
+                <div className="space-y-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="text-xs font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                    <span className="bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-200 text-[10px] px-1.5 py-0.5 rounded">3</span>
+                    Sommario
+                  </h4>
+                  <p className="text-[10px] text-blue-600 dark:text-blue-400 leading-relaxed">
+                    Il sommario verrà generato automaticamente dai capitoli presenti nel testo.
+                  </p>
+                  <p className="text-[10px] text-slate-500">
+                    I numeri di pagina saranno "pag. 00" (placeholder da aggiornare dopo l'impaginazione finale).
+                  </p>
+                </div>
+
+                {/* Colonna 4: Introduzione */}
+                <div className="space-y-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-green-200 dark:border-green-800">
+                  <h4 className="text-xs font-semibold text-green-700 dark:text-green-300 flex items-center gap-1">
+                    <span className="bg-green-200 dark:bg-green-800 text-green-700 dark:text-green-200 text-[10px] px-1.5 py-0.5 rounded">4</span>
+                    Introduzione
+                  </h4>
+                  <div>
+                    <Label className="text-[10px] text-slate-500">Testo Introduzione</Label>
+                    <textarea
+                      value={frontmatter.introduzione}
+                      onChange={(e) => setFrontmatter({...frontmatter, introduzione: e.target.value})}
+                      rows={4}
+                      placeholder="Scrivi qui l'introduzione..."
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-slate-500">Chiusura</Label>
+                    <input
+                      type="text"
+                      value={frontmatter.chiusuraIntroduzione}
+                      onChange={(e) => setFrontmatter({...frontmatter, chiusuraIntroduzione: e.target.value})}
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-sm italic text-right focus:outline-none focus:ring-1 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+                
+                {/* Colonna 5: Parte Finale (Backmatter) */}
+                <div className="space-y-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-rose-200 dark:border-rose-800 lg:col-span-2">
+                  <h4 className="text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-1">
+                    <span className="bg-rose-200 dark:bg-rose-800 text-rose-700 dark:text-rose-200 text-[10px] px-1.5 py-0.5 rounded">5</span>
+                    Parte Finale
+                    <span className="text-[9px] font-normal text-rose-500">(Conclusioni, Call to Action, Ringraziamenti...)</span>
+                  </h4>
+                  <div>
+                    <textarea
+                      value={frontmatter.parteFinale}
+                      onChange={(e) => setFrontmatter({...frontmatter, parteFinale: e.target.value})}
+                      rows={6}
+                      placeholder="Incolla qui conclusioni, call to action, ringraziamenti, note sull'autore, ecc."
+                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
 
         {/* Main Editor Area - 3 colonne */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px_1fr] gap-4 h-[calc(100vh-180px)] min-h-[600px]">
@@ -944,15 +1188,11 @@ export default function Home() {
               </CardTitle>
               {result && (
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 text-xs">
-                    <Copy className="mr-2 h-3 w-3" />
-                    Copia
-                  </Button>
                   <Button variant="default" size="sm" onClick={handleExportDocx} className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white border-0 shadow-md shadow-green-100 dark:shadow-none">
                     <Download className="mr-2 h-3 w-3" />
                     DOCX
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => exportToDocx(aiResult?.correctedText || result.corrected, "Libro_KDP_A5.docx", "kdp_a5")} className="h-8 text-xs border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-900 dark:text-orange-400">
+                  <Button variant="outline" size="sm" onClick={() => exportToDocx(aiResult?.correctedText || result.corrected, "Libro_KDP_A5.docx", "kdp_a5", (frontmatter.titolo || frontmatter.autore) ? frontmatter : undefined)} className="h-8 text-xs border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-900 dark:text-orange-400">
                     <Printer className="mr-2 h-3 w-3" />
                     KDP (A5)
                   </Button>
@@ -989,6 +1229,76 @@ export default function Home() {
                             Vedi Report
                           </Button>
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Anteprima Frontmatter - mostra solo se c'è un risultato */}
+                    {result && (frontmatter.titolo || frontmatter.autore) && (
+                      <div className="mb-8 border-b-2 border-amber-300 dark:border-amber-700 pb-8">
+                        {/* PAGINA 1: COPERTINA */}
+                        <div className="text-center mb-8 pb-8 border-b border-dashed border-slate-300 dark:border-slate-700">
+                          <p className="text-[10px] uppercase text-slate-400 mb-4">— Pagina 1: Copertina —</p>
+                          {frontmatter.autore && (
+                            <p className="uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-6" style={{ fontSize: `${frontmatter.autoreCorpo || 16}px` }}>
+                              {frontmatter.autore}
+                            </p>
+                          )}
+                          {frontmatter.titolo && (
+                            <>
+                              <p className="uppercase font-bold text-slate-900 dark:text-slate-100 mb-2" style={{ fontSize: `${frontmatter.titoloCorpo || 24}px` }}>
+                                {frontmatter.titolo}
+                              </p>
+                              <p className="text-slate-400 mb-4">_________</p>
+                            </>
+                          )}
+                          {frontmatter.sottotitolo && (
+                            <>
+                              <p className="text-slate-700 dark:text-slate-300 mb-2" style={{ fontSize: `${frontmatter.sottotitoloCorpo || 14}px` }}>
+                                {frontmatter.sottotitolo}
+                              </p>
+                              <p className="text-slate-400">____________________</p>
+                            </>
+                          )}
+                        </div>
+                        
+                        {/* PAGINA 2: COLOPHON */}
+                        <div className="text-center mb-8 pb-8 border-b border-dashed border-slate-300 dark:border-slate-700">
+                          <p className="text-[10px] uppercase text-slate-400 mb-4">— Pagina 2: Colophon —</p>
+                          {frontmatter.titolo && <p className="font-bold text-sm mb-1">{frontmatter.titolo}</p>}
+                          {frontmatter.autore && <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">{frontmatter.autore}</p>}
+                          {frontmatter.editore && <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">{frontmatter.editore}</p>}
+                          {frontmatter.sitoInternet && <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">{frontmatter.sitoInternet}</p>}
+                          {frontmatter.copyright && (
+                            <p className="text-[10px] text-slate-500 dark:text-slate-500 max-w-md mx-auto" style={{ textAlign: 'justify' }}>
+                              {frontmatter.copyright}
+                            </p>
+                          )}
+                        </div>
+                        
+                        {/* PAGINA 3: SOMMARIO */}
+                        <div className="text-center mb-8 pb-8 border-b border-dashed border-slate-300 dark:border-slate-700">
+                          <p className="text-[10px] uppercase text-slate-400 mb-4">— Pagina 3: Sommario —</p>
+                          <p className="font-bold text-base mb-4">Sommario</p>
+                          <p className="text-xs text-slate-500 italic">(Generato automaticamente dai capitoli)</p>
+                        </div>
+                        
+                        {/* PAGINA 4: INTRODUZIONE */}
+                        {frontmatter.introduzione && (
+                          <div className="text-center mb-8 pb-8 border-b border-dashed border-slate-300 dark:border-slate-700">
+                            <p className="text-[10px] uppercase text-slate-400 mb-4">— Pagina 4: Introduzione —</p>
+                            <p className="font-bold text-base mb-4">Introduzione</p>
+                            <p className="text-sm text-slate-700 dark:text-slate-300 max-w-lg mx-auto text-justify whitespace-pre-wrap">
+                              {frontmatter.introduzione}
+                            </p>
+                            {frontmatter.chiusuraIntroduzione && (
+                              <p className="text-xs italic text-slate-500 mt-4 text-right max-w-lg mx-auto">
+                                {frontmatter.chiusuraIntroduzione}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        
+                        <p className="text-[10px] uppercase text-amber-600 dark:text-amber-400 text-center font-medium">— Inizio Contenuto —</p>
                       </div>
                     )}
                     
@@ -1037,6 +1347,23 @@ export default function Home() {
                         });
                       })()}
                     </div>
+                    
+                    {/* Anteprima Backmatter (Parte Finale) - mostra solo se c'è un risultato */}
+                    {result && frontmatter.parteFinale && (
+                      <div className="mt-8 border-t-2 border-rose-300 dark:border-rose-700 pt-8">
+                        <p className="text-[10px] uppercase text-rose-600 dark:text-rose-400 text-center font-medium mb-4">— Parte Finale —</p>
+                        <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                          {frontmatter.parteFinale.split('\n').map((line, i) => {
+                            if (!line.trim()) return <div key={i} className="h-4" />;
+                            const isTitle = line.trim() === line.trim().toUpperCase() && line.trim().length > 3 && line.trim().length < 50;
+                            if (isTitle) {
+                              return <p key={i} className="text-center font-bold text-base mt-6 mb-2">{line}</p>;
+                            }
+                            return <p key={i} className="text-justify mb-2">{line}</p>;
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </ScrollArea>
                   
                   {/* Stats & Report Panel */}
@@ -1371,6 +1698,172 @@ export default function Home() {
             >
               <Check className="mr-2 h-4 w-4" />
               Applica {chaptersProposals.length} Capitoli
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Frontmatter */}
+      <Dialog open={showFrontmatterPanel} onOpenChange={setShowFrontmatterPanel}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <BookMarked className="h-5 w-5" />
+              Frontmatter del Libro
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* SEZIONE COPERTINA */}
+            <div className="space-y-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <h3 className="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                <span className="bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 text-xs px-2 py-0.5 rounded">Pagina 1</span>
+                Copertina
+              </h3>
+              <div className="grid gap-4">
+                <div>
+                  <Label className="text-xs text-slate-500">Autore (corpo 16)</Label>
+                  <input
+                    type="text"
+                    value={frontmatter.autore}
+                    onChange={(e) => setFrontmatter({...frontmatter, autore: e.target.value})}
+                    placeholder="Nome Autore"
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Titolo (corpo 24, grassetto)</Label>
+                  <input
+                    type="text"
+                    value={frontmatter.titolo}
+                    onChange={(e) => setFrontmatter({...frontmatter, titolo: e.target.value})}
+                    placeholder="Titolo del Libro"
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-lg font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Sottotitolo (corpo 14)</Label>
+                  <input
+                    type="text"
+                    value={frontmatter.sottotitolo}
+                    onChange={(e) => setFrontmatter({...frontmatter, sottotitolo: e.target.value})}
+                    placeholder="Sottotitolo (opzionale)"
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SEZIONE COLOPHON */}
+            <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+              <h3 className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs px-2 py-0.5 rounded">Pagina 2</span>
+                Colophon (Dati Editoriali)
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-slate-500">Titolo (corpo 14)</Label>
+                  <input
+                    type="text"
+                    value={frontmatter.titolo}
+                    disabled
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-sm bg-slate-100 text-slate-500"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Autore (corpo 12)</Label>
+                  <input
+                    type="text"
+                    value={frontmatter.autore}
+                    disabled
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-sm bg-slate-100 text-slate-500"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Editore (corpo 12)</Label>
+                  <input
+                    type="text"
+                    value={frontmatter.editore}
+                    onChange={(e) => setFrontmatter({...frontmatter, editore: e.target.value})}
+                    placeholder="Nome Editore"
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Sito Internet (corpo 12)</Label>
+                  <input
+                    type="text"
+                    value={frontmatter.sitoInternet}
+                    onChange={(e) => setFrontmatter({...frontmatter, sitoInternet: e.target.value})}
+                    placeholder="www.esempio.com"
+                    className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-500">Copyright (corpo 10)</Label>
+                <Textarea
+                  value={frontmatter.copyright}
+                  onChange={(e) => setFrontmatter({...frontmatter, copyright: e.target.value})}
+                  rows={4}
+                  className="w-full mt-1 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* SEZIONE SOMMARIO - Generato automaticamente */}
+            <div className="space-y-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <h3 className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                <span className="bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-200 text-xs px-2 py-0.5 rounded">Pagina 3</span>
+                Sommario
+              </h3>
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                Il sommario verrà generato automaticamente dai capitoli presenti nel testo.
+                I numeri di pagina saranno "pag. 00" (placeholder da aggiornare manualmente dopo l'impaginazione).
+              </p>
+            </div>
+
+            {/* SEZIONE INTRODUZIONE */}
+            <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <h3 className="font-semibold text-green-700 dark:text-green-300 flex items-center gap-2">
+                <span className="bg-green-200 dark:bg-green-800 text-green-700 dark:text-green-200 text-xs px-2 py-0.5 rounded">Pagina 4</span>
+                Introduzione
+              </h3>
+              <div>
+                <Label className="text-xs text-slate-500">Testo Introduzione (corpo 14)</Label>
+                <Textarea
+                  value={frontmatter.introduzione}
+                  onChange={(e) => setFrontmatter({...frontmatter, introduzione: e.target.value})}
+                  rows={6}
+                  placeholder="Scrivi qui l'introduzione del libro..."
+                  className="w-full mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-500">Chiusura (corpo 12, corsivo, allineato a destra)</Label>
+                <input
+                  type="text"
+                  value={frontmatter.chiusuraIntroduzione}
+                  onChange={(e) => setFrontmatter({...frontmatter, chiusuraIntroduzione: e.target.value})}
+                  className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-sm italic text-right focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowFrontmatterPanel(false)}>
+              Chiudi
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowFrontmatterPanel(false);
+                toast.success("Frontmatter salvato! Verrà incluso nell'export.");
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Salva Frontmatter
             </Button>
           </DialogFooter>
         </DialogContent>

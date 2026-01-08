@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, PageBreak, Footer, PageNumber, NumberFormat } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, PageBreak, Footer, PageNumber, NumberFormat, Table, TableRow, TableCell, WidthType, BorderStyle } from "docx";
 import { saveAs } from "file-saver";
 import mammoth from "mammoth";
 import JSZip from "jszip";
@@ -58,10 +58,31 @@ function extractNumber(name: string): number | null {
   return match ? parseInt(match[0], 10) : null;
 }
 
+// Tipo per il frontmatter del libro
+export interface BookFrontmatter {
+  autore: string;
+  autoreCorpo?: number; // dimensione font in pt
+  titolo: string;
+  titoloCorpo?: number; // dimensione font in pt
+  sottotitolo: string;
+  sottotitoloCorpo?: number; // dimensione font in pt
+  editore: string;
+  sitoInternet: string;
+  copyright: string;
+  introduzione: string;
+  chiusuraIntroduzione: string;
+  parteFinale?: string; // backmatter: conclusioni, call to action, ringraziamenti, ecc.
+}
+
 /**
  * Esporta il testo corretto in un file .docx con formattazione editoriale
  */
-export async function exportToDocx(text: string, filename: string = "Testo_Corretto.docx", format: 'standard' | 'kdp_a5' = 'standard') {
+export async function exportToDocx(
+  text: string, 
+  filename: string = "Testo_Corretto.docx", 
+  format: 'standard' | 'kdp_a5' = 'standard',
+  frontmatter?: BookFrontmatter
+) {
   // NORMALIZZAZIONE AGGRESSIVA PRE-ELABORAZIONE
   // 1. Sostituisce qualsiasi variante di [PAGE_BREAK] (con spazi, tab, case insensitive) con un token standard
   // 2. Rimuove caratteri invisibili che potrebbero rompere la regex
@@ -334,6 +355,420 @@ export async function exportToDocx(text: string, filename: string = "Testo_Corre
     }
   };
 
+  // Genera le pagine frontmatter se presenti
+  const frontmatterChildren: typeof children = [];
+  
+  if (frontmatter && (frontmatter.titolo || frontmatter.autore)) {
+    // ========== PAGINA 1: COPERTINA ==========
+    // Autore (corpo personalizzabile, centrato, in alto)
+    const autoreSize = (frontmatter.autoreCorpo || 16) * 2; // pt -> half-points
+    const titoloSize = (frontmatter.titoloCorpo || 24) * 2;
+    const sottotitoloSize = (frontmatter.sottotitoloCorpo || 14) * 2;
+    
+    if (frontmatter.autore) {
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 2000, after: 400 },
+          children: [
+            new TextRun({
+              text: frontmatter.autore.toUpperCase(),
+              font: "Times New Roman",
+              size: autoreSize,
+            })
+          ]
+        })
+      );
+    }
+    
+    // Titolo (corpo personalizzabile, grassetto, centrato)
+    if (frontmatter.titolo) {
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 800, after: 200 },
+          children: [
+            new TextRun({
+              text: frontmatter.titolo.toUpperCase(),
+              font: "Times New Roman",
+              size: titoloSize,
+              bold: true,
+            })
+          ]
+        })
+      );
+      
+      // Linea decorativa sotto il titolo
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 200, after: 200 },
+          children: [
+            new TextRun({
+              text: "_________",
+              font: "Times New Roman",
+              size: 28,
+            })
+          ]
+        })
+      );
+    }
+    
+    // Sottotitolo (corpo personalizzabile, centrato)
+    if (frontmatter.sottotitolo) {
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 200, after: 200 },
+          children: [
+            new TextRun({
+              text: frontmatter.sottotitolo,
+              font: "Times New Roman",
+              size: sottotitoloSize,
+            })
+          ]
+        })
+      );
+      
+      // Linea decorativa sotto il sottotitolo
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 100, after: 400 },
+          children: [
+            new TextRun({
+              text: "____________________",
+              font: "Times New Roman",
+              size: 28,
+            })
+          ]
+        })
+      );
+    }
+    
+    // ========== PAGINA 2: COLOPHON ==========
+    // Page break
+    frontmatterChildren.push(
+      new Paragraph({
+        pageBreakBefore: true,
+        spacing: { before: 2000 },
+        children: []
+      })
+    );
+    
+    // Titolo (corpo 14, grassetto)
+    if (frontmatter.titolo) {
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 100 },
+          children: [
+            new TextRun({
+              text: frontmatter.titolo,
+              font: "Times New Roman",
+              size: 28, // 14pt
+              bold: true,
+            })
+          ]
+        })
+      );
+    }
+    
+    // Autore (corpo 12)
+    if (frontmatter.autore) {
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 100 },
+          children: [
+            new TextRun({
+              text: frontmatter.autore,
+              font: "Times New Roman",
+              size: 24, // 12pt
+            })
+          ]
+        })
+      );
+    }
+    
+    // Editore (corpo 12)
+    if (frontmatter.editore) {
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 100 },
+          children: [
+            new TextRun({
+              text: frontmatter.editore,
+              font: "Times New Roman",
+              size: 24, // 12pt
+            })
+          ]
+        })
+      );
+    }
+    
+    // Sito Internet (corpo 12)
+    if (frontmatter.sitoInternet) {
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.LEFT,
+          spacing: { after: 400 },
+          children: [
+            new TextRun({
+              text: frontmatter.sitoInternet,
+              font: "Times New Roman",
+              size: 24, // 12pt
+            })
+          ]
+        })
+      );
+    }
+    
+    // Spazio vuoto
+    frontmatterChildren.push(
+      new Paragraph({
+        spacing: { before: 800, after: 400 },
+        children: []
+      })
+    );
+    
+    // Copyright (corpo 10)
+    if (frontmatter.copyright) {
+      frontmatterChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.JUSTIFIED,
+          spacing: { after: 200 },
+          children: [
+            new TextRun({
+              text: frontmatter.copyright,
+              font: "Times New Roman",
+              size: 20, // 10pt
+            })
+          ]
+        })
+      );
+    }
+    
+    // ========== PAGINA 3: SOMMARIO ==========
+    // Page break
+    frontmatterChildren.push(
+      new Paragraph({
+        pageBreakBefore: true,
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 400, after: 600 },
+        children: [
+          new TextRun({
+            text: "Sommario",
+            font: "Times New Roman",
+            size: 32, // 16pt
+            bold: true,
+          })
+        ]
+      })
+    );
+    
+    // Estrai i capitoli dal testo per generare il sommario
+    const chapterRegex = /^Capitolo\s+(\d+)\s*\n([^\n]+)/gim;
+    let chapterMatch;
+    const chapters: {num: string, title: string}[] = [];
+    
+    // Cerca anche "Introduzione" e "Conclusione"
+    if (text.toLowerCase().includes("introduzione")) {
+      chapters.push({ num: "", title: "Introduzione" });
+    }
+    
+    while ((chapterMatch = chapterRegex.exec(text)) !== null) {
+      chapters.push({ num: chapterMatch[1], title: chapterMatch[2].trim() });
+    }
+    
+    if (text.toLowerCase().includes("conclusione")) {
+      chapters.push({ num: "", title: "Conclusione" });
+    }
+    
+    // Genera le voci del sommario come tabella per allineamento perfetto
+    const noBorder = {
+      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+    };
+    
+    const tableRows = chapters.map(chapter => {
+      const label = chapter.num ? `Capitolo ${chapter.num}: ${chapter.title}` : chapter.title;
+      return new TableRow({
+        children: [
+          new TableCell({
+            borders: noBorder,
+            width: { size: 80, type: WidthType.PERCENTAGE },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.LEFT,
+                children: [
+                  new TextRun({
+                    text: label,
+                    font: "Times New Roman",
+                    size: 24, // 12pt
+                  })
+                ]
+              })
+            ]
+          }),
+          new TableCell({
+            borders: noBorder,
+            width: { size: 20, type: WidthType.PERCENTAGE },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({
+                    text: "pag. 000",
+                    font: "Times New Roman",
+                    size: 24,
+                  })
+                ]
+              })
+            ]
+          })
+        ]
+      });
+    });
+    
+    if (tableRows.length > 0) {
+      frontmatterChildren.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: tableRows,
+        })
+      );
+    }
+    
+    // ========== PAGINA 4: INTRODUZIONE ==========
+    if (frontmatter.introduzione) {
+      // Page break
+      frontmatterChildren.push(
+        new Paragraph({
+          pageBreakBefore: true,
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400, after: 600 },
+          children: [
+            new TextRun({
+              text: "Introduzione",
+              font: "Times New Roman",
+              size: 32, // 16pt
+              bold: true,
+            })
+          ]
+        })
+      );
+      
+      // Testo introduzione (corpo 14)
+      const introLines = frontmatter.introduzione.split('\n');
+      for (const line of introLines) {
+        if (line.trim()) {
+          frontmatterChildren.push(
+            new Paragraph({
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { line: 360, after: 240 },
+              children: [
+                new TextRun({
+                  text: line.trim(),
+                  font: "Times New Roman",
+                  size: 28, // 14pt
+                })
+              ]
+            })
+          );
+        }
+      }
+      
+      // Chiusura (corpo 12, corsivo, allineato a destra)
+      if (frontmatter.chiusuraIntroduzione) {
+        frontmatterChildren.push(
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            spacing: { before: 600, after: 200 },
+            children: [
+              new TextRun({
+                text: frontmatter.chiusuraIntroduzione,
+                font: "Times New Roman",
+                size: 24, // 12pt
+                italics: true,
+              })
+            ]
+          })
+        );
+      }
+    }
+    
+    // Page break prima del contenuto principale
+    frontmatterChildren.push(
+      new Paragraph({
+        pageBreakBefore: true,
+        children: []
+      })
+    );
+  }
+  
+  // Genera le pagine backmatter (parte finale) se presenti
+  const backmatterChildren: typeof children = [];
+  
+  if (frontmatter?.parteFinale) {
+    // Page break prima della parte finale
+    backmatterChildren.push(
+      new Paragraph({
+        pageBreakBefore: true,
+        children: []
+      })
+    );
+    
+    // Processa il testo della parte finale riga per riga
+    const parteFinaleLines = frontmatter.parteFinale.split('\n');
+    for (const line of parteFinaleLines) {
+      if (!line.trim()) {
+        backmatterChildren.push(new Paragraph({ children: [] }));
+        continue;
+      }
+      
+      // Riconosci titoli (es. CONCLUSIONI, RINGRAZIAMENTI, ecc.)
+      const isTitle = line.trim() === line.trim().toUpperCase() && line.trim().length > 3 && line.trim().length < 50;
+      
+      if (isTitle) {
+        backmatterChildren.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 400, after: 200 },
+            children: [
+              new TextRun({
+                text: line.trim(),
+                font: "Times New Roman",
+                size: 28, // 14pt
+                bold: true,
+              })
+            ]
+          })
+        );
+      } else {
+        backmatterChildren.push(
+          new Paragraph({
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 200 },
+            children: [
+              new TextRun({
+                text: line,
+                font: "Times New Roman",
+                size: 24, // 12pt
+              })
+            ]
+          })
+        );
+      }
+    }
+  }
+  
+  // Combina frontmatter + contenuto principale + backmatter
+  const allChildren = [...frontmatterChildren, ...children, ...backmatterChildren];
+
   const doc = new Document({
     sections: [
       {
@@ -357,7 +792,7 @@ export async function exportToDocx(text: string, filename: string = "Testo_Corre
             ],
           }),
         } : undefined,
-        children: children,
+        children: allChildren,
       },
     ],
   });

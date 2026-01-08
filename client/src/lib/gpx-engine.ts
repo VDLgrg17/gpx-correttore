@@ -1104,6 +1104,13 @@ export class GPXEngine {
   private applyLayoutRules(text: string): string {
     let t = text;
     
+    // 0. VIRGOLETTE CHIUSE A INIZIO RIGA (v83)
+    // Le virgolette chiuse (», ", ') non possono mai essere all'inizio di una riga.
+    // Se trovate a inizio riga, riattaccale alla riga precedente.
+    // Es: "testo\n»" -> "testo»"
+    // Es: "osservazione\n" " -> "osservazione""
+    t = t.replace(/\n\s*([\u00bb"'])/g, '$1');
+    
     // 1. Normalizza "CAPITOLO" in "Capitolo"
     t = t.replace(/\bCAPITOLO\b/g, "Capitolo");
     
