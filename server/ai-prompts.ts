@@ -217,5 +217,7 @@ Restituisci un JSON con questa struttura:
 - I titoli devono essere brevi e significativi
 - Le descrizioni devono essere concise ma informative
 - Il punto di inizio deve essere identificabile univocamente nel testo
-- Il primo capitolo inizia sempre all'inizio del testo`,
+- Il primo capitolo inizia sempre all'inizio del testo
+- IMPORTANTE: Usa lo stile italiano per titoli e descrizioni: maiuscola SOLO sulla prima lettera della prima parola (es. "La nascita della filosofia", NON "La Nascita Della Filosofia")
+- I nomi propri mantengono la maiuscola (es. "Il pensiero di Aristotele")`,
 };

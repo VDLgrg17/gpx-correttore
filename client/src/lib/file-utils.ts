@@ -132,6 +132,40 @@ export async function exportToDocx(text: string, filename: string = "Testo_Corre
       continue;
     }
 
+    // PRIORITÀ ASSOLUTA: Riconoscimento titoli capitolo (anche dentro ChatBook)
+    // Deve essere controllato PRIMA della logica ChatBook per garantire formattazione corretta
+    const isChapterTitleLine = /^Capitolo\s+\d+$/i.test(trimmed);
+    
+    if (isChapterTitleLine) {
+      // Reset modalità chat quando incontriamo un capitolo
+      currentSpeaker = "none";
+      
+      // OGNI capitolo DEVE iniziare su una nuova pagina (tranne se è il primo elemento)
+      const shouldPageBreak = children.length > 0;
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          pageBreakBefore: shouldPageBreak,
+          spacing: {
+            before: 400,
+            after: 300,
+          },
+          children: [
+            new TextRun({
+              text: trimmed.toUpperCase(),
+              font: "Times New Roman",
+              bold: true,
+              size: 28, // 14pt
+              allCaps: true,
+            })
+          ]
+        })
+      );
+      pendingPageBreak = false;
+      expectSubtitle = true; // La prossima riga sarà il titolo del capitolo
+      continue;
+    }
+    
     // Se siamo in modalità chat, renderizza il paragrafo senza spezzarlo e con lo stile appropriato
     if (currentSpeaker !== "none") {
       const parts = trimmed.split("**");
@@ -168,10 +202,12 @@ export async function exportToDocx(text: string, filename: string = "Testo_Corre
                            isStructuralTitle;
     
     if (isChapterTitle) {
+      // OGNI capitolo DEVE iniziare su una nuova pagina (tranne se è il primo elemento)
+      const shouldPageBreak = children.length > 0; // Page break se c'è già contenuto prima
       children.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          pageBreakBefore: pendingPageBreak,
+          pageBreakBefore: shouldPageBreak || pendingPageBreak,
           spacing: {
             before: 400, // Spazio prima
             after: 300,  // Spazio dopo

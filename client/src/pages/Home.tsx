@@ -1312,48 +1312,34 @@ export default function Home() {
                           <span className="text-sm font-bold text-amber-600 bg-amber-100 dark:bg-amber-900 px-3 py-1 rounded">
                             Capitolo {chapter.number}
                           </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingChapterIndex(editingChapterIndex === index ? null : index)}
-                            className="h-7 px-2"
-                          >
-                            <Edit3 className="h-4 w-4" />
-                          </Button>
                         </div>
                         
-                        {/* Titolo */}
-                        {editingChapterIndex === index ? (
+                        {/* Titolo - sempre editabile */}
+                        <div>
+                          <label className="text-xs text-slate-500 uppercase font-medium mb-1 block">Titolo</label>
                           <input
                             type="text"
                             value={chapter.title}
                             onChange={(e) => handleUpdateChapter(index, 'title', e.target.value)}
-                            className="w-full text-lg font-semibold px-3 py-2 border rounded bg-white dark:bg-slate-800"
+                            className="w-full text-lg font-semibold px-3 py-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                             placeholder="Titolo del capitolo"
                           />
-                        ) : (
-                          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-                            {chapter.title}
-                          </h3>
-                        )}
+                        </div>
                         
-                        {/* Descrizione */}
-                        {editingChapterIndex === index ? (
+                        {/* Descrizione - sempre editabile */}
+                        <div>
+                          <label className="text-xs text-slate-500 uppercase font-medium mb-1 block">Descrizione</label>
                           <textarea
                             value={chapter.description}
                             onChange={(e) => handleUpdateChapter(index, 'description', e.target.value)}
-                            className="w-full text-sm px-3 py-2 border rounded bg-white dark:bg-slate-800 min-h-[80px]"
+                            className="w-full text-sm px-3 py-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 min-h-[60px] focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                             placeholder="Descrizione degli argomenti del capitolo"
                           />
-                        ) : (
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            {chapter.description}
-                          </p>
-                        )}
+                        </div>
                         
                         {/* Anteprima posizione */}
                         <div className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-800 p-2 rounded">
-                          <span className="font-medium">Inizio:</span> {chapter.previewText.substring(0, 100)}...
+                          <span className="font-medium">Inizio:</span> {chapter.previewText?.substring(0, 100) || chapter.startsAt}...
                         </div>
                       </div>
                       
@@ -1363,6 +1349,7 @@ export default function Home() {
                         size="sm"
                         onClick={() => handleRemoveChapter(index)}
                         className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        title="Rimuovi questo capitolo"
                       >
                         <X className="h-4 w-4" />
                       </Button>

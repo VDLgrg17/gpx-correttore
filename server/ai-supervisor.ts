@@ -278,22 +278,57 @@ export function insertChaptersIntoText(
   chapters: ChapterProposal[]
 ): string {
   let result = text;
+  let insertedCount = 0;
   
-  // Ordina i capitoli dal più alto al più basso per evitare problemi con gli indici
+  console.log(`[insertChapters] Tentativo di inserire ${chapters.length} capitoli`);
+  
+  // Ordina i capitoli per insertPosition (dal più alto al più basso) per evitare problemi con gli indici
   const sortedChapters = [...chapters].sort((a, b) => {
-    const posA = result.indexOf(a.startsAt);
-    const posB = result.indexOf(b.startsAt);
+    // Usa insertPosition se disponibile, altrimenti cerca nel testo
+    const posA = a.insertPosition ?? result.indexOf(a.startsAt);
+    const posB = b.insertPosition ?? result.indexOf(b.startsAt);
     return posB - posA; // ordine decrescente
   });
   
   for (const chapter of sortedChapters) {
-    const position = result.indexOf(chapter.startsAt);
+    // Prova prima con insertPosition, poi cerca startsAt nel testo
+    let position = chapter.insertPosition ?? -1;
+    
+    // Se insertPosition non è valido, cerca startsAt
+    if (position === -1 || position >= result.length) {
+      position = result.indexOf(chapter.startsAt);
+    }
+    
+    // Se ancora non trovato, prova una ricerca più flessibile (prime 50 caratteri)
+    if (position === -1 && chapter.startsAt.length > 20) {
+      const shortSearch = chapter.startsAt.substring(0, 50);
+      position = result.indexOf(shortSearch);
+    }
+    
+    // CASO SPECIALE: Se è il Capitolo 1 e non è stato trovato, inseriscilo all'inizio
+    if (position === -1 && chapter.number === 1) {
+      position = 0;
+      console.log(`[insertChapters] Capitolo 1 non trovato, inserito all'inizio del testo`);
+    }
+    
+    console.log(`[insertChapters] Capitolo ${chapter.number}: posizione=${position}, startsAt="${chapter.startsAt.substring(0, 30)}..."`);
+    
     if (position !== -1) {
-      // Formato: Page break + Capitolo X (grassetto, centrato) + titolo + descrizione (centrata) + testo
-      const chapterHeader = `\n\n---PAGE_BREAK---\n\n**Capitolo ${chapter.number}**\n\n${chapter.title}\n\n${chapter.description}\n\n`;
+      // Formato: [PAGE_BREAK] + Capitolo X + titolo + descrizione
+      // NOTA: Non usare ** per grassetto - l'export DOCX applica già il grassetto ai titoli capitolo
+      // Per il Capitolo 1 all'inizio, non serve PAGE_BREAK
+      const needsPageBreak = position > 0;
+      const chapterHeader = needsPageBreak 
+        ? `\n\n[PAGE_BREAK]\n\nCapitolo ${chapter.number}\n\n${chapter.title}\n\n${chapter.description}\n\n`
+        : `Capitolo ${chapter.number}\n\n${chapter.title}\n\n${chapter.description}\n\n`;
       result = result.slice(0, position) + chapterHeader + result.slice(position);
+      insertedCount++;
+    } else {
+      console.warn(`[insertChapters] Capitolo ${chapter.number} NON trovato nel testo`);
     }
   }
+  
+  console.log(`[insertChapters] Inseriti ${insertedCount}/${chapters.length} capitoli`);
   
   return result;
 }
