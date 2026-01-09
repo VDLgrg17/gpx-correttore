@@ -9,7 +9,17 @@ import { exportToDocx, exportToEpub, readFileContent, sortFiles } from "@/lib/fi
 import { DEFAULT_OPTIONS, GPXEngine, GPXOptions, GPXResult } from "@/lib/gpx-engine";
 import { AlertTriangle, BookOpen, Copy, Download, FileText, RefreshCw, Settings, Trash2, Wand2, Printer, Brain, Loader2, Type, Clock, Quote, Sparkles, Pause, Play, Square, BookMarked, Edit3, Check, X, Save, Upload } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { trpc } from "@/lib/trpc";
+// import { trpc } from "@/lib/trpc"; // Disabled for static deployment
+import { 
+  getChunksInfo as getChunksInfoDirect, 
+  analyzeSingleChunk as analyzeSingleChunkDirect, 
+  analyzeChapters as analyzeChaptersDirect, 
+  insertChaptersIntoText,
+  hasGeminiApiKey,
+  setGeminiApiKey,
+  getGeminiApiKey,
+  type AICheckType as AICheckTypeDirect
+} from "@/lib/gemini-direct";
 import { toast } from "sonner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { Switch } from "@/components/ui/switch";
@@ -86,11 +96,9 @@ export default function Home() {
   const stopRequestedRef = useRef(false);
   const pauseRequestedRef = useRef(false);
   
-  // tRPC mutations
-  const getChunksInfoMutation = trpc.aiCheck.getChunksInfo.useMutation();
-  const analyzeSingleChunkMutation = trpc.aiCheck.analyzeSingleChunk.useMutation();
-  const analyzeChaptersMutation = trpc.aiCheck.analyzeChapters.useMutation();
-  const insertChaptersMutation = trpc.aiCheck.insertChapters.useMutation();
+  // API Key state for Gemini
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [tempApiKey, setTempApiKey] = useState(getGeminiApiKey());
   
   // Stato per i capitoli
   const [showChaptersModal, setShowChaptersModal] = useState(false);
@@ -265,8 +273,16 @@ export default function Home() {
     toast.loading("Preparazione analisi sequenziale...", { id: "auto-mode" });
     
     try {
+      // Check API key first
+      if (!hasGeminiApiKey()) {
+        toast.dismiss("auto-mode");
+        setShowApiKeyModal(true);
+        setIsAiProcessing(false);
+        return;
+      }
+      
       // Ottieni info sui chunk PRIMA di attivare autoMode
-      const info = await getChunksInfoMutation.mutateAsync({ text: textToAnalyze });
+      const info = getChunksInfoDirect(textToAnalyze);
       setChunksInfo(info.chunks);
       setTotalChunks(info.totalChunks);
       
@@ -301,11 +317,11 @@ export default function Home() {
         toast.loading(`Analisi blocco ${i + 1}/${info.totalChunks}...`, { id: "chunk-progress" });
         
         try {
-          const chunkResult = await analyzeSingleChunkMutation.mutateAsync({
-            text: textToAnalyze,
-            chunkIndex: i,
-            checkType: checkType,
-          });
+          const chunkResult = await analyzeSingleChunkDirect(
+            textToAnalyze,
+            i,
+            checkType as AICheckTypeDirect,
+          );
           
           // Salva il risultato
           newProcessedChunks.set(i, chunkResult.correctedText);
@@ -446,7 +462,15 @@ export default function Home() {
     toast.loading("Analisi struttura capitoli in corso...", { id: "chapters" });
     
     try {
-      const response = await analyzeChaptersMutation.mutateAsync({ text: textToAnalyze });
+      // Check API key first
+      if (!hasGeminiApiKey()) {
+        toast.dismiss("chapters");
+        setShowApiKeyModal(true);
+        setIsAnalyzingChapters(false);
+        return;
+      }
+      
+      const response = await analyzeChaptersDirect(textToAnalyze);
       setChaptersProposals(response.chapters);
       setShowChaptersModal(true);
       toast.dismiss("chapters");
@@ -483,13 +507,10 @@ export default function Home() {
     toast.loading("Inserimento capitoli nel testo...", { id: "apply-chapters" });
     
     try {
-      const response = await insertChaptersMutation.mutateAsync({
-        text: textToModify,
-        chapters: chaptersProposals,
-      });
+      const resultText = insertChaptersIntoText(textToModify, chaptersProposals);
       
       setAiResult({
-        correctedText: response.text,
+        correctedText: resultText,
         changes: aiResult?.changes || [],
       });
       
@@ -1847,6 +1868,60 @@ export default function Home() {
             >
               <Check className="mr-2 h-4 w-4" />
               Salva Frontmatter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal per inserire la chiave API Gemini */}
+      <Dialog open={showApiKeyModal} onOpenChange={setShowApiKeyModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configurazione API Gemini
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Per usare le verifiche AI, inserisci la tua chiave API di Google Gemini.
+              Puoi ottenerla gratuitamente su{" "}
+              <a 
+                href="https://aistudio.google.com/apikey" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                aistudio.google.com/apikey
+              </a>
+            </p>
+            <div>
+              <Label>Chiave API Gemini</Label>
+              <input
+                type="password"
+                value={tempApiKey}
+                onChange={(e) => setTempApiKey(e.target.value)}
+                placeholder="AIza..."
+                className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              La chiave viene salvata solo nel tuo browser (localStorage) e non viene mai inviata a server esterni.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowApiKeyModal(false)}>
+              Annulla
+            </Button>
+            <Button 
+              onClick={() => {
+                setGeminiApiKey(tempApiKey);
+                setShowApiKeyModal(false);
+                toast.success("Chiave API salvata!");
+              }}
+              disabled={!tempApiKey.trim()}
+            >
+              Salva
             </Button>
           </DialogFooter>
         </DialogContent>

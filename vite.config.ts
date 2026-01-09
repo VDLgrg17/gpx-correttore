@@ -25,7 +25,7 @@ const plugins = [
       theme_color: "#ffffff",
       background_color: "#ffffff",
       display: "standalone",
-      start_url: "/",
+      start_url: "/gpx-correttore/",
       icons: [
         {
           src: "logo.png",
@@ -43,6 +43,7 @@ const plugins = [
 ];
 
 export default defineConfig({
+  base: '/gpx-correttore/',
   plugins,
   resolve: {
     alias: {
