@@ -48,35 +48,52 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // Try multiple possible paths for the dist/public folder
+  // In production, dist/index.js runs from the dist folder
+  // So public folder is at ./public relative to dist/index.js
+  // Which means import.meta.dirname (dist/) + public
   const possiblePaths = [
-    path.resolve(import.meta.dirname, "../..", "dist", "public"),
-    path.resolve(import.meta.dirname, "..", "public"),
+    // When running from dist/index.js, public is a sibling folder
+    path.resolve(import.meta.dirname, "public"),
+    // Fallback: relative to cwd
     path.resolve(process.cwd(), "dist", "public"),
-    "/opt/render/project/dist/public",
+    // Absolute path for Render
+    "/opt/render/project/src/dist/public",
   ];
 
-  let distPath = possiblePaths[0];
+  console.log(`Looking for build directory...`);
+  console.log(`import.meta.dirname: ${import.meta.dirname}`);
+  console.log(`process.cwd(): ${process.cwd()}`);
+
+  let distPath = "";
   for (const p of possiblePaths) {
+    console.log(`Checking path: ${p}`);
     if (fs.existsSync(p)) {
       distPath = p;
       console.log(`Found build directory at: ${distPath}`);
       break;
+    } else {
+      console.log(`Path not found: ${p}`);
     }
   }
 
-  if (!fs.existsSync(distPath)) {
-    console.error(
-      `Could not find the build directory. Tried: ${possiblePaths.join(", ")}`
-    );
-    console.error(`Current working directory: ${process.cwd()}`);
-    console.error(`import.meta.dirname: ${import.meta.dirname}`);
+  if (!distPath) {
+    // Last resort: try to list what's in the directory
+    console.error(`Could not find the build directory.`);
+    try {
+      console.log(`Contents of import.meta.dirname:`, fs.readdirSync(import.meta.dirname));
+      console.log(`Contents of cwd:`, fs.readdirSync(process.cwd()));
+    } catch (e) {
+      console.error(`Error listing directories:`, e);
+    }
+    distPath = possiblePaths[0]; // Use first as fallback
   }
 
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    const indexPath = path.resolve(distPath, "index.html");
+    console.log(`Serving index.html from: ${indexPath}`);
+    res.sendFile(indexPath);
   });
 }
