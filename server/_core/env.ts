@@ -7,4 +7,7 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? process.env.OPENAI_BASE_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? process.env.OPENAI_API_KEY ?? "",
+  // Direct Google Gemini API support
+  geminiApiKey: process.env.GEMINI_API_KEY ?? process.env.OPENAI_API_KEY ?? "",
+  useDirectGemini: !process.env.BUILT_IN_FORGE_API_KEY && !process.env.OPENAI_BASE_URL,
 };

@@ -209,7 +209,21 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
+// Check if we should use direct Google Gemini API
+const useDirectGemini = (): boolean => {
+  const apiKey = ENV.geminiApiKey || ENV.forgeApiKey;
+  // If the API key starts with "AIza", it's a Google API key
+  return apiKey.startsWith("AIza");
+};
+
 const resolveApiUrl = () => {
+  // If using direct Gemini API
+  if (useDirectGemini()) {
+    const apiKey = ENV.geminiApiKey || ENV.forgeApiKey;
+    return `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
+  }
+  
+  // Otherwise use forge or custom URL
   if (ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0) {
     const baseUrl = ENV.forgeApiUrl.replace(/\/$/, "");
     // Se l'URL già contiene /v1, non aggiungerlo di nuovo
@@ -221,8 +235,13 @@ const resolveApiUrl = () => {
   return "https://forge.manus.im/v1/chat/completions";
 };
 
+const getApiKey = () => {
+  return ENV.geminiApiKey || ENV.forgeApiKey;
+};
+
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
 };
@@ -286,8 +305,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     response_format,
   } = params;
 
+  // Use gemini-2.0-flash for direct Gemini API, gemini-2.5-flash for forge
+  const model = useDirectGemini() ? "gemini-2.0-flash" : "gemini-2.5-flash";
+
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model,
     messages: messages.map(normalizeMessage),
   };
 
@@ -303,9 +325,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
+  payload.max_tokens = 32768;
+  
+  // Only add thinking for non-direct Gemini (forge supports it)
+  if (!useDirectGemini()) {
+    payload.thinking = {
+      "budget_tokens": 128
+    };
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({
@@ -319,11 +345,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
+  const apiKey = getApiKey();
   const response = await fetch(resolveApiUrl(), {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
   });
