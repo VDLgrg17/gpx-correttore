@@ -1,1 +1,0 @@
-if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/gpx-correttore/sw.js', { scope: '/gpx-correttore/' })})}
