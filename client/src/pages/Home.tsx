@@ -811,23 +811,6 @@ export default function Home() {
                   </div>
                 </div>
                 
-                {/* Colonna 5: Parte Finale (Backmatter) */}
-                <div className="space-y-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-rose-200 dark:border-rose-800 lg:col-span-2">
-                  <h4 className="text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-1">
-                    <span className="bg-rose-200 dark:bg-rose-800 text-rose-700 dark:text-rose-200 text-[10px] px-1.5 py-0.5 rounded">5</span>
-                    Parte Finale
-                    <span className="text-[9px] font-normal text-rose-500">(Conclusioni, Call to Action, Ringraziamenti...)</span>
-                  </h4>
-                  <div>
-                    <textarea
-                      value={frontmatter.parteFinale}
-                      onChange={(e) => setFrontmatter({...frontmatter, parteFinale: e.target.value})}
-                      rows={6}
-                      placeholder="Incolla qui conclusioni, call to action, ringraziamenti, note sull'autore, ecc."
-                      className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
-                    />
-                  </div>
-                </div>
               </div>
             </CardContent>
           )}

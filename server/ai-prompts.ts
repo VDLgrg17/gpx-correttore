@@ -46,8 +46,16 @@ Evita la frammentazione artificiale del discorso tramite frasi brevi consecutive
 - conseguenza
 - chiarificazione
 - rafforzamento semantico
+- specificazione (la seconda frase specifica o esplicita la prima)
 
 In questi casi utilizza coordinazione o subordinazione.
+
+**REGOLA FONDAMENTALE:**
+Quando due proposizioni condividono lo stesso nucleo semantico e la seconda è esplicativa o specificativa della prima, devono essere unite in un unico periodo separato da virgola, non da punto.
+
+ESEMPIO:
+ERRATO: "Il potere è fondamentale. È la condizione di ogni azione."
+CORRETTO: "Il potere è fondamentale, è la condizione di ogni azione."
 
 **NON INIZIARE UN NUOVO PERIODO con congiunzioni coordinanti ("e", "ma", "però", "quindi", "perché") quando la funzione logica è quella di continuare o completare il periodo precedente.**
 
